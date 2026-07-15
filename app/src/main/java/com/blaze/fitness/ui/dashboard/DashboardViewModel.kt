@@ -10,12 +10,21 @@ import com.blaze.fitness.data.repository.WorkoutRepository
 import com.blaze.fitness.domain.model.WorkoutSession
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import java.util.Locale
+
+/** One point of the "last 7 days" volume bar chart. */
+data class DailyVolume(val dayLabel: String, val volumeKg: Float, val isToday: Boolean)
 
 data class DashboardUiState(
     val workoutsThisWeek: Int = 0,
     val currentStreakDays: Int = 0,
     val totalSessions: Int = 0,
+    val totalVolumeKg: Float = 0f,
+    val dailyVolumes: List<DailyVolume> = emptyList(),
+    val volumeTrend: List<Float> = emptyList(),
     val nutritionTip: String = NutritionTips.random(),
 )
 
@@ -37,8 +46,31 @@ class DashboardViewModel(
                     workoutsThisWeek = sessions.count { it.startedAt.isAfter(Instant.now().minus(7, ChronoUnit.DAYS)) },
                     currentStreakDays = computeStreak(sessions),
                     totalSessions = sessions.size,
+                    totalVolumeKg = sessions.sumOf { it.volumeKg().toDouble() }.toFloat(),
+                    dailyVolumes = computeDailyVolumes(sessions),
+                    volumeTrend = sessions
+                        .sortedBy { it.startedAt }
+                        .takeLast(8)
+                        .map { it.volumeKg() },
                 )
             }
+        }
+    }
+
+    private fun computeDailyVolumes(sessions: List<WorkoutSession>): List<DailyVolume> {
+        val zone = ZoneId.systemDefault()
+        val today = Instant.now().atZone(zone).toLocalDate()
+        val volumeByDate = sessions
+            .groupBy { it.startedAt.atZone(zone).toLocalDate() }
+            .mapValues { (_, daySessions) -> daySessions.sumOf { it.volumeKg().toDouble() }.toFloat() }
+
+        return (6 downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong())
+            DailyVolume(
+                dayLabel = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale("es")).uppercase(),
+                volumeKg = volumeByDate[date] ?: 0f,
+                isToday = date == today,
+            )
         }
     }
 
@@ -57,6 +89,13 @@ class DashboardViewModel(
         return streak
     }
 }
+
+private fun WorkoutSession.volumeKg(): Float =
+    loggedExercises
+        .flatMap { it.sets }
+        .filter { it.completed }
+        .sumOf { (it.reps * it.weightKg).toDouble() }
+        .toFloat()
 
 object NutritionTips {
     private val tips = listOf(
