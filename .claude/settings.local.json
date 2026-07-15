@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-Service -Name 'postgresql*' | Select-Object Name,Status\")",
+      "Bash(powershell -Command \"Restart-Service postgresql-x64-16\" 2>&1)",
+      "Bash(./gradlew.bat :app:compileDebugKotlin --console=plain)",
+      "Read(//c/Program Files/Android/Android Studio/jbr/**)",
+      "Read(//c/Program Files/Android/Android Studio/**)",
+      "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew.bat :app:compileDebugKotlin --console=plain)"
+    ]
+  }
+}
